@@ -1,0 +1,151 @@
+# Orquestacion de todo el ecosistema Nexolu en un solo droplet de DigitalOcean.
+#
+# Asume los 4 repos de servicio clonados como HERMANOS de este repo, todos
+# bajo el mismo directorio padre en el droplet (ver README.md, paso 2):
+#   /opt/nexolu/nexolu-infra/          <- este archivo vive aca
+#   /opt/nexolu/nexolu-pos-api/
+#   /opt/nexolu/nexolu-ia-core/
+#   /opt/nexolu/nexolu-comms-api/
+#   /opt/nexolu/nexolu-payments-core/
+#
+# El reverse proxy y el TLS NO viven aca adentro: nginx corre en el HOST
+# (no en un contenedor) para poder usar certbot en su modo estandar
+# (`certbot --nginx`), asi que cada servicio publica su puerto SOLO en
+# 127.0.0.1 - nginx del host es quien lo expone a internet. Ver
+# nginx/*.conf y README.md.
+#
+# Cada servicio Python/PHP sigue leyendo su propio .env real (copiado de su
+# propio .env.example, igual que en desarrollo local) - este compose no
+# inventa un .env unico compartido.
+
+name: nexolu
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_APP_PASSWORD: ${MYSQL_APP_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/init.sh:/docker-entrypoint-initdb.d/10-init.sh:ro
+    networks: [nexolu]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-proot", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks: [nexolu]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # --- Nexolu POS API (Laravel) - dominio: api.nexolu.co ---
+  # pos.nexolu.co es del monolito legacy, PRODUCTIVO - nunca apunta aca.
+  #
+  # Los 3 servicios de abajo comparten la MISMA imagen (mismo `image:`, un
+  # solo build real) - solo cambia el comando. queue:work persistente, NO
+  # queue:listen (cada job de queue:listen paga bootstrap de Laravel desde
+  # cero, ~250-300ms extra por mensaje - ver nexolu-pos-api/deploy.sh).
+  pos-web:
+    build:
+      context: ../nexolu-pos-api
+      dockerfile: Dockerfile
+    image: nexolu-pos-api:latest
+    restart: unless-stopped
+    env_file: ../nexolu-pos-api/.env
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    volumes:
+      - pos_storage:/var/www/html/storage
+    ports:
+      - "127.0.0.1:8001:80"
+    networks: [nexolu]
+
+  pos-queue:
+    image: nexolu-pos-api:latest
+    restart: unless-stopped
+    env_file: ../nexolu-pos-api/.env
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    volumes:
+      - pos_storage:/var/www/html/storage
+    networks: [nexolu]
+    command: ["php", "artisan", "queue:work", "--sleep=1", "--tries=3", "--max-time=3600"]
+
+  pos-scheduler:
+    image: nexolu-pos-api:latest
+    restart: unless-stopped
+    env_file: ../nexolu-pos-api/.env
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    volumes:
+      - pos_storage:/var/www/html/storage
+    networks: [nexolu]
+    command: ["php", "artisan", "schedule:work"]
+
+  # --- Nexolu IA Core - dominio: ia.nexolu.co ---
+  # Publico a proposito: ademas de pos-api (que le habla por la red interna
+  # `nexolu`, no por internet), otras apps (spa, colegio...) lo van a
+  # consumir directo desde afuera.
+  ia-core:
+    build:
+      context: ../nexolu-ia-core
+      dockerfile: Dockerfile
+    image: nexolu-ia-core:latest
+    restart: unless-stopped
+    env_file: ../nexolu-ia-core/.env
+    depends_on:
+      mysql: { condition: service_healthy }
+    ports:
+      - "127.0.0.1:8000:8000"
+    networks: [nexolu]
+
+  # --- Nexolu Communications - dominio: comms.nexolu.co ---
+  comms-api:
+    build:
+      context: ../nexolu-comms-api
+      dockerfile: Dockerfile
+    image: nexolu-comms-api:latest
+    restart: unless-stopped
+    env_file: ../nexolu-comms-api/.env
+    depends_on:
+      mysql: { condition: service_healthy }
+    ports:
+      - "127.0.0.1:8010:8000"
+    networks: [nexolu]
+
+  # --- Nexolu Payments Core - dominio: payments.nexolu.co ---
+  payments-core:
+    build:
+      context: ../nexolu-payments-core
+      dockerfile: Dockerfile
+    image: nexolu-payments-core:latest
+    restart: unless-stopped
+    env_file: ../nexolu-payments-core/.env
+    depends_on:
+      mysql: { condition: service_healthy }
+    ports:
+      - "127.0.0.1:8020:8000"
+    networks: [nexolu]
+
+networks:
+  nexolu:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  redis_data:
+  pos_storage:
