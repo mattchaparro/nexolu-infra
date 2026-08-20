@@ -7,7 +7,7 @@
 #   ./deploy-menu.sh              Menu interactivo.
 #   ./deploy-menu.sh pos-api      Despliega directo un servicio, sin menu
 #                                 (valores: pos-api, ia-core, comms-api,
-#                                 payments-core, all, infra).
+#                                 payments-core, pos-front, all, infra).
 set -u
 cd "$(dirname "$0")"
 
@@ -111,12 +111,28 @@ deploy_python() {
     return 0
 }
 
+# pos-front NO tiene deploy.sh propio ni Dockerfile todavia - corre como
+# dev server de Vite directo sobre el codigo fuente (bind mount, ver
+# docker-compose.override.yml, servicio "frontend"/container
+# nexolu-pos-front). "Desplegar" aca es git pull + recrear el contenedor
+# (el `npm install && npm run dev` de su propio `command:` corre de nuevo
+# solo con eso). Cuando exista un Dockerfile real (multi-stage a nginx)
+# esto se reemplaza por un deploy.sh como el de los demas servicios.
+deploy_frontend() {
+    log "=== pos-front ==="
+    ( cd ../nexolu-pos-front && git pull ) || return 1
+    docker compose up -d --force-recreate frontend
+    verificar_salud http://127.0.0.1:5173/
+    return 0
+}
+
 deploy_uno() {
     case "$1" in
         pos-api) deploy_pos_api ;;
         ia-core) deploy_python ia-core nexolu-ia-core 8000 ;;
         comms-api) deploy_python comms-api nexolu-comms-api 8010 ;;
         payments-core) deploy_python payments-core nexolu-payments-core 8020 ;;
+        pos-front) deploy_frontend ;;
         *) log "Servicio desconocido: $1"; return 1 ;;
     esac
 }
@@ -128,6 +144,7 @@ deploy_todos() {
         IFS=: read -r nombre repo puerto <<< "$entry"
         deploy_python "$nombre" "$repo" "$puerto"
     done
+    deploy_frontend
 }
 
 # ---------------------------------------------------------------------------
@@ -138,7 +155,8 @@ if [ "${1:-}" != "" ]; then
         infra) levantar_infra ;;
         all) deploy_todos ;;
         pos-api|ia-core|comms-api|payments-core) levantar_infra && deploy_uno "$1" ;;
-        *) echo "Uso: $0 [pos-api|ia-core|comms-api|payments-core|all|infra]"; exit 1 ;;
+        pos-front) deploy_uno "$1" ;;
+        *) echo "Uso: $0 [pos-api|ia-core|comms-api|payments-core|pos-front|all|infra]"; exit 1 ;;
     esac
     exit $?
 fi
@@ -146,7 +164,7 @@ fi
 echo "Nexolu - Deploy interactivo"
 echo
 PS3=$'\n''Que queres desplegar? '
-opciones=("Todos (infra + 4 servicios)" "Solo infra (mysql+redis)" "pos-api" "ia-core" "comms-api" "payments-core" "Salir")
+opciones=("Todos (infra + 5 servicios)" "Solo infra (mysql+redis)" "pos-api" "ia-core" "comms-api" "payments-core" "pos-front" "Salir")
 select opt in "${opciones[@]}"; do
     case "$REPLY" in
         1) deploy_todos; break ;;
@@ -155,7 +173,8 @@ select opt in "${opciones[@]}"; do
         4) levantar_infra && deploy_uno ia-core; break ;;
         5) levantar_infra && deploy_uno comms-api; break ;;
         6) levantar_infra && deploy_uno payments-core; break ;;
-        7) exit 0 ;;
+        7) deploy_uno pos-front; break ;;
+        8) exit 0 ;;
         *) echo "Opcion invalida." ;;
     esac
 done
