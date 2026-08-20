@@ -16,9 +16,21 @@ Repos que orquesta (clonados como **hermanos** de este repo en el droplet):
 
 **`pos.nexolu.co` es del monolito legacy — productivo, nunca apunta a este
 droplet.** El POS nuevo vive en `api.nexolu.co`. El frontend nuevo
-(`nexolu-pos-front`, todavía no desplegado) usará `new-pos.nexolu.co` — ese
-dominio queda reservado para cuando ese repo esté listo, no hay nada que
-configurar por ahora.
+(`nexolu-pos-front`) usará `new-pos.nexolu.co` en producción — ya corre en
+el ambiente de staging (SG, ver `docs/STAGING_SG.md`) pero todavía sin
+`Dockerfile`/`deploy.sh` propio, así que no sigue el mismo patrón que los
+4 servicios de la tabla de arriba hasta que exista.
+
+## Este README es el plan de producción
+
+Para el ambiente de staging (SG) — gestionado desde el SuperAdmin, con
+particularidades propias (`docker-compose.override.yml`, `pos-front`
+corriendo como dev server, el droplet se destruye/recrea en vez de
+apagarse) — ver:
+
+- `docs/STAGING_SG.md` — cómo está armado el droplet de SG.
+- `docs/ADMIN_PANEL.md` — qué es y qué gestiona el SuperAdmin
+  (`nexolu-admin` + `nexolu-admin-front`).
 
 ## Arquitectura
 
@@ -191,6 +203,8 @@ docker compose exec -T mysql mysqldump -uroot -p<MYSQL_ROOT_PASSWORD> \
 - **Base de datos por servicio con su propio usuario** (en vez de un solo
   `nexolu` compartido) — déjalo para cuando el aislamiento importe más que
   la simplicidad de hoy.
-- **`nexolu-pos-front`**: aún no desplegado. Cuando esté listo, agrega su
-  propio `deploy.sh` en ese repo y su vhost en `nginx/new-pos.nexolu.co.conf`
-  siguiendo el mismo patrón que los demás.
+- **`nexolu-pos-front` en producción**: aún no desplegado (sí corre en SG,
+  ver `docs/STAGING_SG.md`, pero como dev server de Vite sin build). Falta
+  un `Dockerfile` real (multi-stage a nginx sirviendo estáticos) y su
+  propio `deploy.sh`, siguiendo el mismo patrón que los demás repos de
+  servicio, más su vhost en `nginx/new-pos.nexolu.co.conf`.
