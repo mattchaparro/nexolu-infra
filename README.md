@@ -135,13 +135,24 @@ queda instalada sola.
 docker compose up -d mysql redis
 ```
 
-Espera a que MySQL esté sano (`docker compose ps`), y carga el esquema de
-`pos-api` — **nunca se corre `php artisan migrate`** en este proyecto, el
-esquema (85 tablas) viene completo de `database/legacy-schema/schema.sql`:
+Espera a que MySQL esté sano (`docker compose ps`), y carga el esquema base de
+`pos-api` — el esquema (85+ tablas) viene completo de
+`database/legacy-schema/schema.sql`, `php artisan migrate` no sirve para
+levantarlo desde cero:
 
 ```bash
 docker compose exec -T mysql mysql -unexolu -p<MYSQL_APP_PASSWORD> pos_saas \
   < ../nexolu-pos-api/database/legacy-schema/schema.sql
+```
+
+Inmediatamente después, siembra el baseline de migraciones (una sola vez por
+ambiente - marca ese esquema como "ya migrado" sin recrear nada, ver
+"Database & migrations" en `nexolu-pos-api/CLAUDE.md`) para que
+`php artisan migrate` funcione de ahí en adelante con cualquier migración
+nueva que llegue en un deploy:
+
+```bash
+docker compose exec -T pos-web php artisan migrate:baseline
 ```
 
 Y despliega los 4 servicios, cada uno con su propio script:
