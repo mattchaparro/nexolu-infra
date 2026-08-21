@@ -27,6 +27,12 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_APP_PASSWORD: ${MYSQL_APP_PASSWORD}
+      # time_zone de MySQL queda en SYSTEM (default) - esto es lo que hace
+      # que SYSTEM resuelva a Bogota en vez de UTC del contenedor. Belt-
+      # and-suspenders con el DB_TIMEZONE explicito que nexolu-pos-api ya
+      # fuerza por sesion PDO (ver su config/database.php) - Colombia no
+      # tiene horario de verano, asi que ambos coinciden siempre.
+      TZ: America/Bogota
     volumes:
       - mysql_data:/var/lib/mysql
       - ./mysql/init.sh:/docker-entrypoint-initdb.d/10-init.sh:ro
@@ -63,6 +69,12 @@ services:
     image: nexolu-pos-api:latest
     restart: unless-stopped
     env_file: ../nexolu-pos-api/.env
+    environment:
+      # OS-level, ademas de APP_TIMEZONE/DB_TIMEZONE que ya fuerza Laravel
+      # (ver nexolu-pos-api/config/app.php) - asi que logs del sistema,
+      # `date` de shell, etc. tambien quedan en Bogota, no solo lo que pasa
+      # por PHP/MySQL.
+      TZ: America/Bogota
     depends_on:
       mysql: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -76,6 +88,8 @@ services:
     image: nexolu-pos-api:latest
     restart: unless-stopped
     env_file: ../nexolu-pos-api/.env
+    environment:
+      TZ: America/Bogota
     depends_on:
       mysql: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -88,6 +102,8 @@ services:
     image: nexolu-pos-api:latest
     restart: unless-stopped
     env_file: ../nexolu-pos-api/.env
+    environment:
+      TZ: America/Bogota
     depends_on:
       mysql: { condition: service_healthy }
       redis: { condition: service_healthy }
