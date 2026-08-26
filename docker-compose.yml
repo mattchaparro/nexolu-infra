@@ -55,7 +55,7 @@ services:
       timeout: 5s
       retries: 10
 
-  # --- Nexolu POS API (Laravel) - dominio: api.nexolu.co ---
+  # --- Nexolu POS API (Laravel) - dominio: pos-backend.nexolu.co ---
   # pos.nexolu.co es del monolito legacy, PRODUCTIVO - nunca apunta aca.
   #
   # Los 3 servicios de abajo comparten la MISMA imagen (mismo `image:`, un

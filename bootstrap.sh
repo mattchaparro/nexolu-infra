@@ -54,7 +54,7 @@ cat <<'EOF'
    etc.) - ver README.md seccion 3 para el detalle completo de cada uno.
 
 3. Certificados TLS (solo si los 4 dominios YA resuelven a esta IP):
-     certbot --nginx -d api.nexolu.co
+     certbot --nginx -d pos-backend.nexolu.co
      certbot --nginx -d ia.nexolu.co
      certbot --nginx -d comms.nexolu.co
      certbot --nginx -d payments.nexolu.co

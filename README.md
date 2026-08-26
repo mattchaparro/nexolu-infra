@@ -9,13 +9,13 @@ Repos que orquesta (clonados como **hermanos** de este repo en el droplet):
 
 | Repo | Dominio | Puerto interno |
 |---|---|---|
-| `nexolu-pos-api` | `api.nexolu.co` | 127.0.0.1:8001 |
+| `nexolu-pos-api` | `pos-backend.nexolu.co` | 127.0.0.1:8001 |
 | `nexolu-ia-core` | `ia.nexolu.co` | 127.0.0.1:8000 |
 | `nexolu-comms-api` | `comms.nexolu.co` | 127.0.0.1:8010 |
 | `nexolu-payments-core` | `payments.nexolu.co` | 127.0.0.1:8020 |
 
 **`pos.nexolu.co` es del monolito legacy — productivo, nunca apunta a este
-droplet.** El POS nuevo vive en `api.nexolu.co`. El frontend nuevo
+droplet.** El POS nuevo vive en `pos-backend.nexolu.co`. El frontend nuevo
 (`nexolu-pos-front`) usará `new-pos.nexolu.co` en producción — ya corre en
 el ambiente de staging (SG, ver `docs/STAGING_SG.md`) pero todavía sin
 `Dockerfile`/`deploy.sh` propio, así que no sigue el mismo patrón que los
@@ -60,7 +60,7 @@ apagarse) — ver:
 
 - Ubuntu 24.04 LTS, 2 vCPU / 4 GB RAM como piso razonable para los 4
   servicios + MySQL + Redis a este tamaño de operación.
-- Apuntar los 4 dominios (`api.nexolu.co`, `ia.nexolu.co`,
+- Apuntar los 4 dominios (`pos-backend.nexolu.co`, `ia.nexolu.co`,
   `comms.nexolu.co`, `payments.nexolu.co`) a la IP del droplet (registro
   A) **antes** de correr certbot — falla si el dominio no resuelve
   todavía.
@@ -87,7 +87,7 @@ solo los referencia (`env_file:`), no los reemplaza.
 **`nexolu-pos-api/.env`** — puntos clave para Docker (nombres de host son
 los nombres de servicio de `docker-compose.yml`, no `127.0.0.1`):
 ```
-APP_URL=https://api.nexolu.co
+APP_URL=https://pos-backend.nexolu.co
 DB_HOST=mysql
 DB_DATABASE=pos_saas
 DB_USERNAME=nexolu
@@ -99,7 +99,7 @@ PAYMENTS_CORE_BASE_URL=http://payments-core:8000
 MESSAGING_DRIVER=whatsapp_direct   # cambiar a nexolu_comms cuando se decida el cutover
 ```
 El webhook de WhatsApp en el dashboard de Meta debe apuntar a
-`https://api.nexolu.co/api/webhooks/whatsapp` (mientras
+`https://pos-backend.nexolu.co/api/webhooks/whatsapp` (mientras
 `MESSAGING_DRIVER=whatsapp_direct`) o a `https://comms.nexolu.co/webhooks/whatsapp/pos`
 (cuando se active `nexolu_comms`) — nunca a `pos.nexolu.co`, ese es el
 legacy.
@@ -120,7 +120,7 @@ cp .env.example .env   # completar MYSQL_ROOT_PASSWORD y MYSQL_APP_PASSWORD
 
 Solo después de que los 4 dominios ya resuelvan a la IP del droplet:
 ```bash
-certbot --nginx -d api.nexolu.co
+certbot --nginx -d pos-backend.nexolu.co
 certbot --nginx -d ia.nexolu.co
 certbot --nginx -d comms.nexolu.co
 certbot --nginx -d payments.nexolu.co
@@ -172,7 +172,7 @@ propias, no un dump heredado.
 
 ```bash
 docker compose ps
-curl -s https://api.nexolu.co/up
+curl -s https://pos-backend.nexolu.co/up
 curl -s https://ia.nexolu.co/health
 curl -s https://comms.nexolu.co/health
 curl -s https://payments.nexolu.co/health
