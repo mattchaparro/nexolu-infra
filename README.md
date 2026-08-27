@@ -16,10 +16,18 @@ Repos que orquesta (clonados como **hermanos** de este repo en el droplet):
 
 **`pos.nexolu.co` es del monolito legacy — productivo, nunca apunta a este
 droplet.** El POS nuevo vive en `pos-backend.nexolu.co`. El frontend nuevo
-(`nexolu-pos-front`) usará `new-pos.nexolu.co` en producción — ya corre en
-el ambiente de staging (SG, ver `docs/STAGING_SG.md`) pero todavía sin
-`Dockerfile`/`deploy.sh` propio, así que no sigue el mismo patrón que los
-4 servicios de la tabla de arriba hasta que exista.
+(`nexolu-pos-front`) vive en `new-pos.nexolu.co` - sigue sin `Dockerfile`
+propio ni servicio en `docker-compose.yml`, así que no sigue el mismo
+patrón que los 4 servicios de la tabla de arriba, pero **ya tiene dos
+formas de desplegarse** según el droplet (`deploy-menu.sh pos-front`
+detecta cuál aplica automáticamente, ver el comentario de
+`deploy_frontend()` ahí mismo):
+
+- **Producción**: build estático (`nexolu-pos-front/deploy.sh` - git pull +
+  `npm run build`) servido directo por nginx del host desde `dist/`, sin
+  contenedor.
+- **SG (staging)**: dev server de Vite en un contenedor con bind mount
+  sobre el código fuente - ver `docs/STAGING_SG.md`.
 
 ## Este README es el plan de producción
 

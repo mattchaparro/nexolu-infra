@@ -111,18 +111,38 @@ deploy_python() {
     return 0
 }
 
-# pos-front NO tiene deploy.sh propio ni Dockerfile todavia - corre como
-# dev server de Vite directo sobre el codigo fuente (bind mount, ver
-# docker-compose.override.yml, servicio "frontend"/container
-# nexolu-pos-front). "Desplegar" aca es git pull + recrear el contenedor
-# (el `npm install && npm run dev` de su propio `command:` corre de nuevo
-# solo con eso). Cuando exista un Dockerfile real (multi-stage a nginx)
-# esto se reemplaza por un deploy.sh como el de los demas servicios.
+# pos-front tiene DOS patrones de deploy segun el droplet - cual aplica no
+# se puede saber por el repo (nexolu-pos-front es el mismo checkout en
+# ambos lados), solo mirando que existe en ESTE droplet:
+#   - SG (staging): sin Dockerfile todavia, corre como dev server de Vite
+#     directo sobre el codigo fuente (bind mount, ver
+#     docker-compose.override.yml - NO commiteado, local a ese droplet -
+#     servicio "frontend"/contenedor nexolu-pos-front). Desplegar es
+#     git pull + recrear el contenedor (su `npm install && npm run dev`
+#     de `command:` corre de nuevo solo con eso).
+#   - Produccion: build estatico servido directo por nginx del host desde
+#     dist/ (ver nginx/new-pos.nexolu.co.conf) - sin contenedor, delega en
+#     nexolu-pos-front/deploy.sh (git pull + npm install + npm run build).
+# Se distingue por si el compose YA MEZCLADO de este droplet define un
+# servicio "frontend" (solo pasa si el override de SG esta presente) -
+# mismo chequeo tanto en modo interactivo como en modo directo (`pos-front`
+# como argumento), asi que el panel de SuperAdmin no necesita saber en
+# cual de los dos esta el droplet al que le habla.
 deploy_frontend() {
     log "=== pos-front ==="
-    ( cd ../nexolu-pos-front && git pull ) || return 1
-    docker compose up -d --force-recreate frontend
-    verificar_salud http://127.0.0.1:5173/
+    if docker compose config --services 2>/dev/null | grep -qx frontend; then
+        log "    (patron SG: dev server de Vite en contenedor)"
+        ( cd ../nexolu-pos-front && git pull ) || return 1
+        docker compose up -d --force-recreate frontend
+        verificar_salud http://127.0.0.1:5173/
+    elif [ -x ../nexolu-pos-front/deploy.sh ]; then
+        log "    (patron produccion: build estatico servido por nginx)"
+        ../nexolu-pos-front/deploy.sh || return 1
+        verificar_salud https://new-pos.nexolu.co/
+    else
+        log "    ERROR: ni el servicio 'frontend' de SG ni ../nexolu-pos-front/deploy.sh existen en este droplet - no se puede desplegar aca."
+        return 1
+    fi
     return 0
 }
 

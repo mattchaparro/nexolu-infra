@@ -24,11 +24,22 @@ a entrar al panel que necesitás para encenderlo (bug real, ya corregido).
 ## Multi-ambiente
 
 Todo endpoint recibe `{env}` en el path (`/v1/admin/infra/sg/status`,
-`/v1/admin/payments/sg/merchants`) — hoy `"sg"` es el único ambiente
-registrado. Un ambiente sin `droplet_name` configurado (así va a
-registrarse `"prod"` cuando exista, hasta tener su propio droplet) no
+`/v1/admin/payments/sg/merchants`) — `"sg"` y `"prod"` son los dos
+ambientes registrados. Un ambiente sin ningún droplet configurado no
 tiene ninguna capacidad de infraestructura, ni siquiera de solo lectura —
 ver `require_infra_capable` en `nexolu-admin/app/core/environments.py`.
+
+**A diferencia de SG (un solo droplet con todo), producción son DOS
+droplets separados** — `nexolu-core` (`ia-core`, `comms-api`,
+`payments-core`) y `nexolu-pos-prod` (`pos-api`, `pos-front`). El panel lo
+modela como un diccionario de droplets por rol lógico dentro de un mismo
+ambiente `"prod"` (`"core"`/`"pos"`, ver
+`nexolu-admin/docs/PRODUCTION_SETUP.md` § 2.1) — no como dos ambientes
+separados. `GET /infra/{env}/status`, `/metrics` y `/branches` devuelven
+un resultado por droplet (`{"default": ...}` en SG, `{"core": ...,
+"pos": ...}` en prod); apagar/encender/snapshot puntual son por droplet
+(`/infra/{env}/{droplet}/jobs/...`); desplegar y editar `.env` siguen
+siendo por servicio — el panel resuelve solo en qué droplet vive cada uno.
 
 ## Qué gestiona
 
@@ -61,8 +72,15 @@ Servicios que este panel conoce, y cómo se relacionan con este repo:
 | `ia-core` | nexolu-ia-core | ia-core | sí |
 | `comms-api` | nexolu-comms-api | comms-api | sí |
 | `payments-core` | nexolu-payments-core | payments-core | sí |
-| `pos-front` | nexolu-pos-front | frontend | sí |
+| `pos-front` | nexolu-pos-front | frontend (solo en SG - ver nota) | sí* |
 | `infra` | (mysql/redis, este repo) | — | no |
+
+\* `pos-front` en producción no tiene compose service (build estático
+servido por nginx, ver `deploy-menu.sh`/`nexolu-pos-front/deploy.sh`) -
+el panel SÍ puede editar su `.env` ahí, pero el "recrear contenedor para
+tomar valores nuevos" de arriba no aplica: como Vite hornea las variables
+en el bundle al compilar, un cambio de `.env` en producción no toma
+efecto hasta el próximo deploy (`npm run build`), no con un restart.
 
 `infra` queda deliberadamente sin editor de `.env`: `MYSQL_ROOT_PASSWORD`/
 `MYSQL_APP_PASSWORD` solo se aplican la primera vez que se inicializa el
