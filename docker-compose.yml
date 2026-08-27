@@ -123,6 +123,12 @@ services:
     image: nexolu-ia-core:latest
     restart: unless-stopped
     env_file: ../nexolu-ia-core/.env
+    environment:
+      # Sin esto quedaba en UTC del contenedor (python:3.12-slim trae
+      # tzdata, solo faltaba la variable) - mismo motivo que pos-web mas
+      # abajo: logs y timestamps de la app en Bogota, no solo lo que ya
+      # fuerza el TZ de mysql.
+      TZ: America/Bogota
     depends_on:
       mysql: { condition: service_healthy }
     ports:
@@ -137,6 +143,8 @@ services:
     image: nexolu-comms-api:latest
     restart: unless-stopped
     env_file: ../nexolu-comms-api/.env
+    environment:
+      TZ: America/Bogota
     depends_on:
       mysql: { condition: service_healthy }
     ports:
@@ -151,6 +159,8 @@ services:
     image: nexolu-payments-core:latest
     restart: unless-stopped
     env_file: ../nexolu-payments-core/.env
+    environment:
+      TZ: America/Bogota
     depends_on:
       mysql: { condition: service_healthy }
     ports:
