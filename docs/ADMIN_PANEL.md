@@ -107,6 +107,43 @@ de todos los servicios a la vez.
   referencia), ver el estado del último intento de webhook de salida, y
   reenviarlo a mano si quedó pendiente.
 
+## Deploy
+
+**Ninguno de los dos vive en este repo ni en `deploy-menu.sh`** - ambos
+corren en un droplet propio (`pos.chaparro.dev`, el mismo droplet legacy
+de `pos-saas`, no `nexolu-core` ni `nexolu-pos-prod`), fuera del stack de
+`docker-compose.yml` de este repo. Hasta el 2026-08-27 se desplegaban a
+mano, sin script (encontrado en vivo esa fecha, investigando un bug de
+zona horaria en el panel); cada repo tiene ahora su propio `deploy.sh`
+documentado acá.
+
+**`nexolu-admin`** (BFF) - contenedor Docker suelto, sin compose:
+
+```bash
+ssh root@pos.chaparro.dev 'cd /opt/nexolu-admin && bash deploy.sh'
+```
+
+`git pull` + `docker build` + recrea el contenedor (`--restart
+unless-stopped`, puerto `127.0.0.1:8001`, monta `./ssh:/ssh:ro` con las
+deploy keys que usa para SSHear a los droplets de SG/prod, `--env-file
+.env`). Nginx (`api-admin.nexolu.co.conf`) hace proxy a ese puerto.
+Verificar: `curl -s https://api-admin.nexolu.co/health`.
+
+**`nexolu-admin-front`** (SPA) - build estático, sin contenedor:
+
+```bash
+cd nexolu-admin-front && bash deploy.sh
+```
+
+Corre desde la máquina del desarrollador (`npm run build` local, mismo
+motivo que `pos-saas`/`nexolu-pos-front`: el build de Vite es pesado para
+el droplet), sube `dist/` por rsync a `/var/www/admin.nexolu.co/`
+(`--delete`, los assets llevan hash) y ajusta permisos a
+`larasail:larasail` (no `www-data` - así está ese directorio
+específicamente). Nginx (`admin.nexolu.co.conf`) sirve estático con
+`try_files ... /index.html`. No hace falta tocar el servidor: es
+puramente build local + rsync.
+
 ## Ver también
 
 - `nexolu-admin/README.md` — arquitectura del BFF, stack, cómo correrlo
