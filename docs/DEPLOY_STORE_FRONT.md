@@ -15,9 +15,29 @@ Todo esto es manual y **todavia no se hizo en produccion**.
 
 1. **DNS**: registro `A` de `tienda.nexolu.co` al droplet de produccion.
 
-2. **Checkout**:
+2. **Repo y llave de despliegue.** Cada repo del droplet clona con su
+   propia deploy key y su alias de SSH (ver `~/.ssh/config` del droplet:
+   `github.com-nexolu-pos-front`, etc.). Para la tienda hace falta lo mismo:
+
    ```bash
-   cd /opt/nexolu && git clone <repo> nexolu-store-front
+   ssh-keygen -t ed25519 -f ~/.ssh/deploy_nexolu-store-front -N '' -C 'deploy store-front'
+   cat >> ~/.ssh/config <<'EOF'
+
+   Host github.com-nexolu-store-front
+     HostName github.com
+     User git
+     IdentityFile ~/.ssh/deploy_nexolu-store-front
+     IdentitiesOnly yes
+   EOF
+   cat ~/.ssh/deploy_nexolu-store-front.pub   # → agregar como deploy key en GitHub
+   ```
+
+   Las deploy keys son de **solo lectura** a propósito: desde el droplet no
+   se puede pushear (ver la memoria de gotchas de git en droplets).
+
+   ```bash
+   cd /opt/nexolu
+   git clone git@github.com-nexolu-store-front:mattchaparro/nexolu-store-front.git
    ```
 
 3. **Variables**: `cp .env.example .env` y apuntar `VITE_API_BASE_URL` a
@@ -49,11 +69,22 @@ Todo esto es manual y **todavia no se hizo en produccion**.
 
 ## Deploys siguientes
 
+Desde el panel (`admin.nexolu.co` → Infra → prod → store-front), o en el
+droplet:
+
 ```bash
 ./deploy-menu.sh store-front
 ```
 
-o directamente `nexolu-store-front/deploy.sh`. Si el build falla, sale != 0
+o directamente `nexolu-store-front/deploy.sh`.
+
+`store-front` está registrado en `nexolu-admin` igual que los demás
+servicios (`SERVICE_REPOS`, `SERVICE_DROPLET_ROLE = "pos"`,
+`_DEPLOY_SERVICES`), con una diferencia: **no tiene servicio de compose en
+ningún ambiente**. Es un build estático servido por el nginx del host, así
+que su `.env` solo se lee en tiempo de build — editarlo desde el panel
+exige volver a desplegar para que tenga efecto, a diferencia del resto,
+donde basta recrear el contenedor. Si el build falla, sale != 0
 **sin tocar `current`**: la tienda sigue sirviendo la version anterior.
 `./deploy.sh rollback` vuelve a la release previa sin reconstruir.
 
