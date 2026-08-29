@@ -121,8 +121,10 @@ deploy_python() {
 #     git pull + recrear el contenedor (su `npm install && npm run dev`
 #     de `command:` corre de nuevo solo con eso).
 #   - Produccion: build estatico servido directo por nginx del host desde
-#     dist/ (ver nginx/new-pos.nexolu.co.conf) - sin contenedor, delega en
-#     nexolu-pos-front/deploy.sh (git pull + npm install + npm run build).
+#     el symlink `current` (ver nginx/new-pos.nexolu.co.conf). Delega en
+#     nexolu-pos-front/deploy.sh, que compila en un contenedor efimero con
+#     tope de memoria y publica la release cambiando `current` de forma
+#     atomica - ver docs/DEPLOY_POS_FRONT.md.
 # Se distingue por si el compose YA MEZCLADO de este droplet define un
 # servicio "frontend" (solo pasa si el override de SG esta presente) -
 # mismo chequeo tanto en modo interactivo como en modo directo (`pos-front`
@@ -136,7 +138,11 @@ deploy_frontend() {
         docker compose up -d --force-recreate frontend
         verificar_salud http://127.0.0.1:5173/
     elif [ -x ../nexolu-pos-front/deploy.sh ]; then
-        log "    (patron produccion: build estatico servido por nginx)"
+        log "    (patron produccion: build en contenedor + release atomica)"
+        # Si el build falla, deploy.sh sale != 0 SIN haber tocado `current`:
+        # el sitio sigue sirviendo la release anterior. Propagar ese error
+        # es importante - el panel admin lo muestra como deploy fallido en
+        # vez de decir "listo" sobre una version que nunca se publico.
         ../nexolu-pos-front/deploy.sh || return 1
         verificar_salud https://new-pos.nexolu.co/
     else

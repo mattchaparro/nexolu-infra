@@ -23,9 +23,13 @@ formas de desplegarse** según el droplet (`deploy-menu.sh pos-front`
 detecta cuál aplica automáticamente, ver el comentario de
 `deploy_frontend()` ahí mismo):
 
-- **Producción**: build estático (`nexolu-pos-front/deploy.sh` - git pull +
-  `npm run build`) servido directo por nginx del host desde `dist/`, sin
-  contenedor.
+- **Producción**: build estático servido directo por nginx del host. El
+  build corre en un **contenedor efímero con tope de memoria**, y cada
+  build queda en `releases/<timestamp>/` con un symlink `current` que se
+  mueve de forma atómica al final — el cliente nunca ve un build a medias
+  y un build que se pase de memoria no puede tumbar el droplet. Detalle
+  completo, incluido el incidente que originó este diseño:
+  **`docs/DEPLOY_POS_FRONT.md`**.
 - **SG (staging)**: dev server de Vite en un contenedor con bind mount
   sobre el código fuente - ver `docs/STAGING_SG.md`.
 
@@ -222,8 +226,10 @@ docker compose exec -T mysql mysqldump -uroot -p<MYSQL_ROOT_PASSWORD> \
 - **Base de datos por servicio con su propio usuario** (en vez de un solo
   `nexolu` compartido) — déjalo para cuando el aislamiento importe más que
   la simplicidad de hoy.
-- **`nexolu-pos-front` en producción**: aún no desplegado (sí corre en SG,
-  ver `docs/STAGING_SG.md`, pero como dev server de Vite sin build). Falta
-  un `Dockerfile` real (multi-stage a nginx sirviendo estáticos) y su
-  propio `deploy.sh`, siguiendo el mismo patrón que los demás repos de
-  servicio, más su vhost en `nginx/new-pos.nexolu.co.conf`.
+- **`nexolu-pos-front` en producción**: ya desplegado, con `deploy.sh`
+  propio (build en contenedor + releases atómicas) y su vhost en
+  `nginx/new-pos.nexolu.co.conf` — ver `docs/DEPLOY_POS_FRONT.md`. Sigue
+  **sin `Dockerfile` de runtime** a propósito: lo que se sirve son
+  estáticos del host vía el nginx que ya termina TLS para todos los
+  vhosts; meterlo en un contenedor con su propio nginx obligaría a
+  proxy-pasar estáticos o mover TLS, sin resolver ningún problema real.

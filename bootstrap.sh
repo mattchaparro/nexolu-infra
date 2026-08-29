@@ -10,6 +10,29 @@
 #     no HTTPS - ver README.md).
 set -e
 
+# Los droplets de Nexolu son de 1-2 GB y DigitalOcean no provisiona swap por
+# defecto. Sin swap, un pico de memoria no dispara el OOM killer de forma
+# ordenada: la maquina entra en thrashing y se cuelga entera, sin SSH ni
+# consola. Paso real el 2026-08-28 en nexolu-pos-prod (build de pos-front,
+# ver docs/DEPLOY_POS_FRONT.md) - se llevo puestos MySQL, pos-api y nginx.
+# El swap no es para "tener mas RAM": es la red de contencion que convierte
+# un cuelgue duro en un proceso lento o un proceso muerto.
+echo "==> Configurando swap (2 GB) si no existe"
+if [ "$(swapon --show --noheadings | wc -l)" -eq 0 ]; then
+    fallocate -l 2G /swapfile
+    chmod 600 /swapfile
+    mkswap /swapfile
+    swapon /swapfile
+    grep -q '^/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+    # swappiness bajo: usar swap como red de contencion ante picos, no como
+    # memoria de uso corriente (degradaria MySQL).
+    sysctl -w vm.swappiness=10
+    grep -q '^vm.swappiness' /etc/sysctl.conf || echo 'vm.swappiness=10' >> /etc/sysctl.conf
+    echo "    swap de 2 GB activo y persistente en /etc/fstab"
+else
+    echo "    ya hay swap configurado, se salta"
+fi
+
 echo "==> Instalando Docker Engine + Compose plugin"
 curl -fsSL https://get.docker.com | sh
 
