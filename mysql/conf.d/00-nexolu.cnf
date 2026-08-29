@@ -1,0 +1,48 @@
+#
+# Tuning base de MySQL para toda la stack Nexolu.
+#
+# Motivo (2026-08-28): despues del downgrade de nexolu-core a un droplet de
+# 1GB, mysqld estaba tomando 420MB de RSS - 44% de la RAM de la maquina -
+# para servir tres bases que entre todas pesan 0.6MB. Con la RAM agotada el
+# kernel no podia sostener page cache (quedaba en ~73MB), asi que cada
+# ejecucion de binario se releia de disco: 18-33 MB/s de lectura sostenida
+# SIN trafico de aplicacion, y la CPU perdida en iowait/sys en vez de en
+# trabajo util. El 2026-08-25 el OOM killer ya se habia llevado a mysqld.
+#
+# Todo lo de aca es seguro para los tres droplets. Lo que SI depende del
+# tamano de la maquina es innodb_buffer_pool_size, que se pasa por
+# MYSQL_BUFFER_POOL_SIZE en el .env de cada droplet (ver docker-compose.yml)
+# - nexolu-pos-prod tiene una base de POS real y ahi 64M se queda corto.
+
+[mysqld]
+
+# El grueso del ahorro: performance_schema reserva ~150-200MB de estructuras
+# al arrancar. Es util para profiling, pero nadie lo esta consumiendo y en
+# 1GB es la diferencia entre caber y no caber. Si alguna vez hace falta
+# diagnosticar queries, se prende temporalmente y se reinicia mysql.
+performance_schema = OFF
+
+# Ningun droplet tiene replicas, y los backups son snapshots de DigitalOcean,
+# no binlog - pero MySQL 8.x lo trae encendido por defecto: escritura de
+# disco y espacio para nada. OJO: sin binlog tampoco hay point-in-time
+# recovery, asi que si algun dia se monta una replica o PITR hay que volver
+# a habilitarlo.
+skip_log_bin
+
+# Sin O_DIRECT las paginas de InnoDB quedan cacheadas DOS veces: en el buffer
+# pool y otra vez en el page cache del kernel. Con la RAM al limite eso es
+# desperdicio puro, y ademas es justo el page cache el que estaba faltando.
+innodb_flush_method = O_DIRECT
+
+# Los grants de la app son nexolu@% y root@%, nadie depende de resolver
+# hostnames. Ahorra el host cache y saca un lookup de DNS del camino de cada
+# conexion nueva. Los usuarios internos @localhost siguen entrando por socket.
+skip_name_resolve
+host_cache_size = 0
+
+# Los defaults (151 / 16M / 4000 / 2000) estan dimensionados para servidores
+# dedicados. La carga real son tres servicios FastAPI con pools chicos.
+max_connections = 100
+innodb_log_buffer_size = 8M
+table_open_cache = 400
+table_definition_cache = 400

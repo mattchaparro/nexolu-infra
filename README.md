@@ -128,6 +128,12 @@ Y el `.env` de este repo (infraestructura pura):
 cp .env.example .env   # completar MYSQL_ROOT_PASSWORD y MYSQL_APP_PASSWORD
 ```
 
+Ahi tambien va **`MYSQL_BUFFER_POOL_SIZE`**, el unico parametro del tuning de
+MySQL que depende del tamano del droplet (`64M` en nexolu-core, `256M` en los
+de 2GB). El resto del tuning es igual para todos y esta commiteado en
+`mysql/conf.d/00-nexolu.cnf` — ver los comentarios de ese archivo para el
+porque de cada valor.
+
 ## 4. TLS con certbot
 
 Solo después de que los 4 dominios ya resuelvan a la IP del droplet:

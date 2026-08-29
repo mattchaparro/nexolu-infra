@@ -1,0 +1,7 @@
+# Secretos de infraestructura de cada droplet (ver .env.example).
+.env
+
+# Ajustes locales de UN droplet puntual - el compose base es el compartido.
+# Hoy lo usa nexolu-core para el bind de mysql; ver el header del archivo en
+# ese droplet.
+docker-compose.override.yml

@@ -33,17 +33,35 @@ services:
       # fuerza por sesion PDO (ver su config/database.php) - Colombia no
       # tiene horario de verano, asi que ambos coinciden siempre.
       TZ: America/Bogota
+    # innodb_buffer_pool_size es lo unico del tuning que depende del tamano
+    # del droplet, asi que sale del .env de cada maquina (el resto vive en
+    # mysql/conf.d/00-nexolu.cnf, igual para todos). El default de 128M es el
+    # que MySQL ya traia, asi que un droplet sin la variable no cambia nada.
+    command: ["--innodb-buffer-pool-size=${MYSQL_BUFFER_POOL_SIZE:-128M}"]
     volumes:
       - mysql_data:/var/lib/mysql
       - ./mysql/init.sh:/docker-entrypoint-initdb.d/10-init.sh:ro
+      - ./mysql/conf.d:/etc/mysql/conf.d:ro
     ports:
       - "10.116.0.6:3306:3306"
     networks: [nexolu]
+    # interval de 5s era para que `depends_on: service_healthy` arrancara
+    # rapido, pero seguia corriendo para siempre: 12 `docker exec` por minuto
+    # solo de este healthcheck, cada uno levantando un proceso. En un droplet
+    # sin page cache disponible eso se traduce en lectura de disco constante.
+    # start_interval mantiene el arranque igual de rapido (5s mientras dura
+    # start_period) y baja a 30s una vez que el contenedor esta sano.
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-proot", "-h", "localhost"]
-      interval: 5s
+      # La password sale del entorno del contenedor: antes decia -proot
+      # fijo, que no es la password real - funcionaba de casualidad porque
+      # mysqladmin ping devuelve 0 igual con access denied, a costa de un
+      # "Access denied" en el error log cada 5s.
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p\"$$MYSQL_ROOT_PASSWORD\""]
+      interval: 30s
       timeout: 5s
-      retries: 10
+      retries: 5
+      start_period: 60s
+      start_interval: 5s
 
   redis:
     image: redis:7-alpine
@@ -51,11 +69,14 @@ services:
     volumes:
       - redis_data:/data
     networks: [nexolu]
+    # Mismo criterio que mysql: rapido para arrancar, tranquilo en regimen.
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
+      interval: 30s
       timeout: 5s
-      retries: 10
+      retries: 5
+      start_period: 30s
+      start_interval: 5s
 
   # --- Nexolu POS API (Laravel) - dominio: pos-backend.nexolu.co ---
   # pos.nexolu.co es del monolito legacy, PRODUCTIVO - nunca apunta aca.
