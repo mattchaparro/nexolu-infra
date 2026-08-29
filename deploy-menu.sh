@@ -7,7 +7,8 @@
 #   ./deploy-menu.sh              Menu interactivo.
 #   ./deploy-menu.sh pos-api      Despliega directo un servicio, sin menu
 #                                 (valores: pos-api, ia-core, comms-api,
-#                                 payments-core, pos-front, all, infra).
+#                                 payments-core, pos-front, store-front,
+#                                 all, infra).
 set -u
 cd "$(dirname "$0")"
 
@@ -152,6 +153,22 @@ deploy_frontend() {
     return 0
 }
 
+# store-front (tienda online publica). A diferencia de pos-front, tiene UN
+# solo patron: build estatico + release atomica servida por nginx
+# (nginx/tienda.nexolu.co.conf). No hay montaje en SG todavia, asi que en un
+# droplet donde el repo no esta clonado esto avisa y sale sin romper un
+# `all`.
+deploy_store_front() {
+    log "=== store-front ==="
+    if [ ! -x ../nexolu-store-front/deploy.sh ]; then
+        log "    (sin nexolu-store-front en este droplet, se omite)"
+        return 0
+    fi
+    ../nexolu-store-front/deploy.sh || return 1
+    verificar_salud https://tienda.nexolu.co/
+    return 0
+}
+
 deploy_uno() {
     case "$1" in
         pos-api) deploy_pos_api ;;
@@ -159,6 +176,7 @@ deploy_uno() {
         comms-api) deploy_python comms-api nexolu-comms-api 8010 ;;
         payments-core) deploy_python payments-core nexolu-payments-core 8020 ;;
         pos-front) deploy_frontend ;;
+        store-front) deploy_store_front ;;
         *) log "Servicio desconocido: $1"; return 1 ;;
     esac
 }
@@ -171,6 +189,7 @@ deploy_todos() {
         deploy_python "$nombre" "$repo" "$puerto"
     done
     deploy_frontend
+    deploy_store_front
 }
 
 # ---------------------------------------------------------------------------
@@ -181,8 +200,8 @@ if [ "${1:-}" != "" ]; then
         infra) levantar_infra ;;
         all) deploy_todos ;;
         pos-api|ia-core|comms-api|payments-core) levantar_infra && deploy_uno "$1" ;;
-        pos-front) deploy_uno "$1" ;;
-        *) echo "Uso: $0 [pos-api|ia-core|comms-api|payments-core|pos-front|all|infra]"; exit 1 ;;
+        pos-front|store-front) deploy_uno "$1" ;;
+        *) echo "Uso: $0 [pos-api|ia-core|comms-api|payments-core|pos-front|store-front|all|infra]"; exit 1 ;;
     esac
     exit $?
 fi
@@ -190,7 +209,7 @@ fi
 echo "Nexolu - Deploy interactivo"
 echo
 PS3=$'\n''Que queres desplegar? '
-opciones=("Todos (infra + 5 servicios)" "Solo infra (mysql+redis)" "pos-api" "ia-core" "comms-api" "payments-core" "pos-front" "Salir")
+opciones=("Todos (infra + 6 servicios)" "Solo infra (mysql+redis)" "pos-api" "ia-core" "comms-api" "payments-core" "pos-front" "store-front" "Salir")
 select opt in "${opciones[@]}"; do
     case "$REPLY" in
         1) deploy_todos; break ;;
@@ -200,7 +219,8 @@ select opt in "${opciones[@]}"; do
         5) levantar_infra && deploy_uno comms-api; break ;;
         6) levantar_infra && deploy_uno payments-core; break ;;
         7) deploy_uno pos-front; break ;;
-        8) exit 0 ;;
+        8) deploy_uno store-front; break ;;
+        9) exit 0 ;;
         *) echo "Opcion invalida." ;;
     esac
 done
