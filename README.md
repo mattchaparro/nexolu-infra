@@ -14,6 +14,27 @@ Repos que orquesta (clonados como **hermanos** de este repo en el droplet):
 | `nexolu-comms-api` | `comms.nexolu.co` | 127.0.0.1:8010 |
 | `nexolu-payments-core` | `payments.nexolu.co` | 127.0.0.1:8020 |
 
+### Lo que este repo NO orquesta
+
+Hay un droplet entero fuera de su alcance: el legacy **`nexolu`**
+(`134.122.116.201`), donde viven el monolito `pos-saas`, el panel
+`nexolu-admin`/`nexolu-admin-front` y — desde 2026-08-30 —
+`nexolu-spa-api`/`nexolu-spa-front`.
+
+Ahí **no hay `docker-compose.yml` ni `deploy-menu.sh`**: cada servicio corre
+como contenedor Docker suelto y trae su propio `deploy.sh` en su repo.
+Mandarle un comando de este repo a ese droplet falla con "no such file", y
+es exactamente el error que `SERVICE_DEPLOY_COMMANDS`
+(`nexolu-admin/app/infra/env_files.py`) existe para evitar.
+
+Ese droplet tiene **1 vCPU compartido con la producción real de
+`pos.nexolu.co`**, así que nada se compila ahí. Detalle completo en
+`nexolu-utils/docs/infra/topology.md`.
+
+**El DNS de `nexolu.co` está en Hostinger** (`nebula`/`aurora.dns-parking.com`),
+no en DigitalOcean: los registros A se crean en el panel de Hostinger y
+`doctl` no los ve. Sin el A record publicado, `certbot` no puede validar.
+
 **`pos.nexolu.co` es del monolito legacy — productivo, nunca apunta a este
 droplet.** El POS nuevo vive en `pos-backend.nexolu.co`. El frontend nuevo
 (`nexolu-pos-front`) vive en `new-pos.nexolu.co` - sigue sin `Dockerfile`
