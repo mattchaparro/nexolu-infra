@@ -190,6 +190,26 @@ services:
       - "127.0.0.1:8020:8000"
     networks: [nexolu]
 
+  # --- Nexolu Auth - dominio: auth.nexolu.co ---
+  # Emite las aserciones SSO que los demas productos canjean. Los
+  # consumidores NO le hablan a este servicio: verifican la firma con la
+  # llave publica que llevan en su propio .env, asi que un auth caido no
+  # bloquea ningun login que ya este andando.
+  auth:
+    build:
+      context: ../nexolu-auth
+      dockerfile: Dockerfile
+    image: nexolu-auth:latest
+    restart: unless-stopped
+    env_file: ../nexolu-auth/.env
+    environment:
+      TZ: America/Bogota
+    depends_on:
+      mysql: { condition: service_healthy }
+    ports:
+      - "127.0.0.1:8030:8000"
+    networks: [nexolu]
+
 networks:
   nexolu:
     driver: bridge

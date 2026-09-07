@@ -72,6 +72,7 @@ Servicios que este panel conoce, y cómo se relacionan con este repo:
 | `ia-core` | nexolu-ia-core | ia-core | sí |
 | `comms-api` | nexolu-comms-api | comms-api | sí |
 | `payments-core` | nexolu-payments-core | payments-core | sí |
+| `auth` | nexolu-auth | auth | sí** |
 | `pos-front` | nexolu-pos-front | frontend (solo en SG - ver nota) | sí* |
 | `infra` | (mysql/redis, este repo) | — | no |
 
@@ -81,6 +82,14 @@ el panel SÍ puede editar su `.env` ahí, pero el "recrear contenedor para
 tomar valores nuevos" de arriba no aplica: como Vite hornea las variables
 en el bundle al compilar, un cambio de `.env` en producción no toma
 efecto hasta el próximo deploy (`npm run build`), no con un restart.
+
+\*\* Editar `NEXOLU_AUTH_PUBLIC_KEYS` en el `.env` de un consumidor
+(`pos-api`, `spa-api`) y recrear es el **interruptor de reversa del
+SSO**: vaciarla deja el canje en 503 y el login propio de ese producto
+intacto. En el `.env` de `auth` en sí vive la llave PRIVADA - cambiarla
+invalida de golpe todas las públicas que ya tienen los consumidores, así
+que no se toca salvo para una rotación deliberada (ver el README de
+nexolu-auth).
 
 `infra` queda deliberadamente sin editor de `.env`: `MYSQL_ROOT_PASSWORD`/
 `MYSQL_APP_PASSWORD` solo se aplican la primera vez que se inicializa el

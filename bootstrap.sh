@@ -40,9 +40,9 @@ echo "==> Instalando nginx + certbot"
 apt-get update
 apt-get install -y nginx certbot python3-certbot-nginx
 
-echo "==> Clonando los 4 repos de servicio como hermanos de este directorio"
+echo "==> Clonando los 5 repos de servicio como hermanos de este directorio"
 cd ..
-for repo in nexolu-pos-api nexolu-ia-core nexolu-comms-api nexolu-payments-core; do
+for repo in nexolu-pos-api nexolu-ia-core nexolu-comms-api nexolu-payments-core nexolu-auth; do
     if [ -d "$repo" ]; then
         echo "    $repo ya existe, se salta (usa su propio deploy.sh para actualizar)"
     else
@@ -71,16 +71,23 @@ cat <<'EOF'
      cd ../nexolu-ia-core        && cp .env.example .env   # completar
      cd ../nexolu-comms-api      && cp .env.example .env   # completar
      cd ../nexolu-payments-core  && cp .env.example .env   # completar
+     cd ../nexolu-auth           && cp .env.example .env   # completar
+
+   nexolu-auth ademas necesita su par de llaves, que se genera una sola
+   vez y NO se regenera en cada deploy (cambiarla invalida las llaves
+   publicas que ya tienen los consumidores):
+     docker compose run --rm auth python -m scripts.generate_keypair
 
    Los hosts internos son los nombres de servicio de docker-compose.yml
    (DB_HOST=mysql, REDIS_HOST=redis, IA_CORE_BASE_URL=http://ia-core:8000,
    etc.) - ver README.md seccion 3 para el detalle completo de cada uno.
 
-3. Certificados TLS (solo si los 4 dominios YA resuelven a esta IP):
+3. Certificados TLS (solo si los 5 dominios YA resuelven a esta IP):
      certbot --nginx -d pos-backend.nexolu.co
      certbot --nginx -d ia.nexolu.co
      certbot --nginx -d comms.nexolu.co
      certbot --nginx -d payments.nexolu.co
+     certbot --nginx -d auth.nexolu.co
 
    certbot instala su propio timer de renovacion automatica (systemctl
    status certbot.timer) - no hace falta cron aparte.
@@ -92,6 +99,7 @@ Cuando los .env esten listos, corre:
    ../nexolu-ia-core/deploy.sh
    ../nexolu-comms-api/deploy.sh
    ../nexolu-payments-core/deploy.sh
+   ../nexolu-auth/deploy.sh
 
 Ver README.md para el detalle de cada paso.
 EOF

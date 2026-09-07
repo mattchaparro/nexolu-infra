@@ -9,8 +9,9 @@ mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" <<-SQL
     CREATE DATABASE IF NOT EXISTS nexolu_ia_core CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
     CREATE DATABASE IF NOT EXISTS nexolu_comms CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
     CREATE DATABASE IF NOT EXISTS nexolu_payments_core CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    CREATE DATABASE IF NOT EXISTS nexolu_auth CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
-    -- Un solo usuario de aplicacion con permisos sobre las 4 bases -- no
+    -- Un solo usuario de aplicacion con permisos sobre las 5 bases -- no
     -- root, pero tampoco un usuario distinto por servicio todavia (mismo
     -- criterio de "no agregar complejidad antes de necesitarla" del
     -- droplet: se puede partir en usuarios separados el dia que haga falta
@@ -20,5 +21,6 @@ mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" <<-SQL
     GRANT ALL PRIVILEGES ON nexolu_ia_core.* TO 'nexolu'@'%';
     GRANT ALL PRIVILEGES ON nexolu_comms.* TO 'nexolu'@'%';
     GRANT ALL PRIVILEGES ON nexolu_payments_core.* TO 'nexolu'@'%';
+    GRANT ALL PRIVILEGES ON nexolu_auth.* TO 'nexolu'@'%';
     FLUSH PRIVILEGES;
 SQL

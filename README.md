@@ -13,6 +13,7 @@ Repos que orquesta (clonados como **hermanos** de este repo en el droplet):
 | `nexolu-ia-core` | `ia.nexolu.co` | 127.0.0.1:8000 |
 | `nexolu-comms-api` | `comms.nexolu.co` | 127.0.0.1:8010 |
 | `nexolu-payments-core` | `payments.nexolu.co` | 127.0.0.1:8020 |
+| `nexolu-auth` | `auth.nexolu.co` | 127.0.0.1:8030 |
 
 ### Lo que este repo NO orquesta
 
@@ -91,12 +92,12 @@ apagarse) — ver:
 
 ## 1. Provisionar el droplet
 
-- Ubuntu 24.04 LTS, 2 vCPU / 4 GB RAM como piso razonable para los 4
+- Ubuntu 24.04 LTS, 2 vCPU / 4 GB RAM como piso razonable para los 5
   servicios + MySQL + Redis a este tamaño de operación.
-- Apuntar los 4 dominios (`pos-backend.nexolu.co`, `ia.nexolu.co`,
-  `comms.nexolu.co`, `payments.nexolu.co`) a la IP del droplet (registro
-  A) **antes** de correr certbot — falla si el dominio no resuelve
-  todavía.
+- Apuntar los 5 dominios (`pos-backend.nexolu.co`, `ia.nexolu.co`,
+  `comms.nexolu.co`, `payments.nexolu.co`, `auth.nexolu.co`) a la IP del
+  droplet (registro A) **antes** de correr certbot — falla si el dominio
+  no resuelve todavía.
 
 ## 2. Primer arranque
 
@@ -137,12 +138,26 @@ El webhook de WhatsApp en el dashboard de Meta debe apuntar a
 (cuando se active `nexolu_comms`) — nunca a `pos.nexolu.co`, ese es el
 legacy.
 
-**`nexolu-ia-core/.env`, `nexolu-comms-api/.env`, `nexolu-payments-core/.env`**
+**`nexolu-ia-core/.env`, `nexolu-comms-api/.env`, `nexolu-payments-core/.env`,
+`nexolu-auth/.env`**
 ```
 DATABASE_URL=mysql+aiomysql://nexolu:<MYSQL_APP_PASSWORD>@mysql:3306/<su_base>
 ```
-(`nexolu_ia_core`, `nexolu_comms`, `nexolu_payments_core` respectivamente —
-ver `mysql/init.sh`).
+(`nexolu_ia_core`, `nexolu_comms`, `nexolu_payments_core`, `nexolu_auth`
+respectivamente — ver `mysql/init.sh`).
+
+`nexolu-auth` necesita ademas su par de llaves RSA, que se genera **una
+sola vez**:
+```bash
+docker compose run --rm auth python -m scripts.generate_keypair
+```
+Imprime `AUTH_JWT_KID` + `AUTH_JWT_PRIVATE_KEY` para su `.env`, y el
+`NEXOLU_AUTH_PUBLIC_KEYS` que va en el `.env` de **cada consumidor**
+(`nexolu-pos-api`, `nexolu-spa-api` y `nexolu-admin`). Los consumidores
+verifican con esa llave sin llamar a `auth.nexolu.co`, asi que dejar esa
+variable vacia apaga el SSO sin apagar el login propio de cada producto —
+es el interruptor de reversa. **No regenerar el par en cada deploy**: la
+llave vieja deja de validar y todos los canjes fallan a la vez.
 
 Y el `.env` de este repo (infraestructura pura):
 ```bash
@@ -157,12 +172,13 @@ porque de cada valor.
 
 ## 4. TLS con certbot
 
-Solo después de que los 4 dominios ya resuelvan a la IP del droplet:
+Solo después de que los 5 dominios ya resuelvan a la IP del droplet:
 ```bash
 certbot --nginx -d pos-backend.nexolu.co
 certbot --nginx -d ia.nexolu.co
 certbot --nginx -d comms.nexolu.co
 certbot --nginx -d payments.nexolu.co
+certbot --nginx -d auth.nexolu.co
 ```
 Cada uno edita su vhost en `/etc/nginx/sites-available/` para agregar el
 bloque 443 + certificados, y redirige 80→443. La renovación automática
@@ -194,18 +210,30 @@ nueva que llegue en un deploy:
 docker compose exec -T pos-web php artisan migrate:baseline
 ```
 
-Y despliega los 4 servicios, cada uno con su propio script:
+Y despliega los 5 servicios, cada uno con su propio script:
 
 ```bash
 ../nexolu-pos-api/deploy.sh
 ../nexolu-ia-core/deploy.sh
 ../nexolu-comms-api/deploy.sh
 ../nexolu-payments-core/deploy.sh
+../nexolu-auth/deploy.sh
 ```
 
-`deploy.sh` de los 3 servicios Python corre `alembic upgrade head` como
+`deploy.sh` de los 4 servicios Python corre `alembic upgrade head` como
 parte del deploy — a diferencia de `pos-api`, sus tablas son nuevas y
 propias, no un dump heredado.
+
+Con `nexolu-auth` ya arriba, sembrar la identidad del superadmin (una
+sola vez):
+```bash
+mysql -N -e "SELECT password FROM pos_saas.users WHERE id = 1" | \
+  docker compose run --rm -T auth python -m scripts.seed_identity \
+    --email <tu-correo> --name "<tu nombre>" --password-hash - \
+    --link nexolu-pos-api=1 --link nexolu-admin=1
+```
+Copia el hash bcrypt que ya existe, asi que la contrasena sigue siendo la
+misma de siempre.
 
 ## 6. Verificar
 
@@ -215,6 +243,8 @@ curl -s https://pos-backend.nexolu.co/up
 curl -s https://ia.nexolu.co/health
 curl -s https://comms.nexolu.co/health
 curl -s https://payments.nexolu.co/health
+curl -s https://auth.nexolu.co/health
+curl -s https://auth.nexolu.co/.well-known/jwks.json
 docker compose logs -f pos-queue   # confirmar que el worker esta corriendo, no queue:listen
 ```
 
@@ -228,10 +258,11 @@ cd /opt/nexolu/nexolu-pos-api && ./deploy.sh
 cd /opt/nexolu/nexolu-ia-core && ./deploy.sh
 cd /opt/nexolu/nexolu-comms-api && ./deploy.sh
 cd /opt/nexolu/nexolu-payments-core && ./deploy.sh
+cd /opt/nexolu/nexolu-auth && ./deploy.sh
 ```
 
 Cada uno hace `git pull` + `docker compose build` + `up -d` de solo ese
-servicio (y `alembic upgrade head` para los 3 Python) — unos segundos de
+servicio (y `alembic upgrade head` para los 4 Python) — unos segundos de
 downtime por contenedor reiniciado, aceptable a este tamaño de operación.
 
 ## Respaldo
