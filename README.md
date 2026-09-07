@@ -227,13 +227,20 @@ propias, no un dump heredado.
 Con `nexolu-auth` ya arriba, sembrar la identidad del superadmin (una
 sola vez):
 ```bash
-mysql -N -e "SELECT password FROM pos_saas.users WHERE id = 1" | \
+mysql -N -e "SELECT password FROM pos_saas.users WHERE email = '<tu-correo>'" | \
   docker compose run --rm -T auth python -m scripts.seed_identity \
     --email <tu-correo> --name "<tu nombre>" --password-hash - \
-    --link nexolu-pos-api=1 --link nexolu-admin=1
+    --link nexolu-pos-api=<id-real> --link nexolu-admin=1
 ```
 Copia el hash bcrypt que ya existe, asi que la contrasena sigue siendo la
 misma de siempre.
+
+**Buscar el usuario por correo, nunca por id.** `docs/CUTOVER_PILOT_LOG.md`
+dice `users#1`, pero en produccion el superadmin es `users#40` (verificado
+el 2026-09-07): los ids no se preservaron al migrar. El mismo id va en
+`--link nexolu-pos-api=<id>`; si se pone el equivocado, el canje cae al
+fallback por correo y funciona igual, tapando el vinculo roto — por eso el
+log dice por cual de los dos caminos resolvio.
 
 ## 6. Verificar
 
