@@ -14,6 +14,20 @@ Repos que orquesta (clonados como **hermanos** de este repo en el droplet):
 | `nexolu-comms-api` | `comms.nexolu.co` | 127.0.0.1:8010 |
 | `nexolu-payments-core` | `payments.nexolu.co` | 127.0.0.1:8020 |
 | `nexolu-auth` | `auth.nexolu.co` | 127.0.0.1:8030 |
+| `hogar-app` | `hogar.nexolu.co` | 127.0.0.1:8040 |
+
+`hogar-app` es el unico que no se llama `nexolu-*`: no es un producto del
+ecosistema sino una app personal (cuentas, recibos, tareas y mercado de una
+casa) que reusa esta infraestructura, el chat de `ia-core` y el WhatsApp de
+`comms-api`. Tambien es el unico **sin MySQL** — su base es un archivo
+SQLite en el volumen `hogar_data`, asi que no tiene paso de migracion y **el
+volumen no es opcional**: sin el, cada rebuild borra las cuentas. Levanta
+dos contenedores sobre la misma imagen: el web y `hogar-recordatorios`, que
+manda el resumen diario por WhatsApp.
+
+Su instalacion de primera vez NO va por `bootstrap.sh` si el droplet ya
+existe: trae su propio `scripts/instalar-en-core.sh`, que ademas de clonar y
+publicar el vhost lo registra en `ia-core` y en `comms-api`.
 
 ### Lo que este repo NO orquesta
 
@@ -94,10 +108,10 @@ apagarse) — ver:
 
 - Ubuntu 24.04 LTS, 2 vCPU / 4 GB RAM como piso razonable para los 5
   servicios + MySQL + Redis a este tamaño de operación.
-- Apuntar los 5 dominios (`pos-backend.nexolu.co`, `ia.nexolu.co`,
-  `comms.nexolu.co`, `payments.nexolu.co`, `auth.nexolu.co`) a la IP del
-  droplet (registro A) **antes** de correr certbot — falla si el dominio
-  no resuelve todavía.
+- Apuntar los 6 dominios (`pos-backend.nexolu.co`, `ia.nexolu.co`,
+  `comms.nexolu.co`, `payments.nexolu.co`, `auth.nexolu.co`,
+  `hogar.nexolu.co`) a la IP del droplet (registro A) **antes** de correr
+  certbot — falla si el dominio no resuelve todavía.
 
 ## 2. Primer arranque
 

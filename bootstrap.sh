@@ -40,9 +40,13 @@ echo "==> Instalando nginx + certbot"
 apt-get update
 apt-get install -y nginx certbot python3-certbot-nginx
 
-echo "==> Clonando los 5 repos de servicio como hermanos de este directorio"
+echo "==> Clonando los 6 repos de servicio como hermanos de este directorio"
 cd ..
-for repo in nexolu-pos-api nexolu-ia-core nexolu-comms-api nexolu-payments-core nexolu-auth; do
+# hogar-app va al final y rompe el patron del nombre a proposito: es el unico
+# que no se llama nexolu-* (no es un producto del ecosistema, es una app
+# propia que reusa esta infraestructura, el chat de ia-core y el WhatsApp de
+# comms-api).
+for repo in nexolu-pos-api nexolu-ia-core nexolu-comms-api nexolu-payments-core nexolu-auth hogar-app; do
     if [ -d "$repo" ]; then
         echo "    $repo ya existe, se salta (usa su propio deploy.sh para actualizar)"
     else
@@ -88,6 +92,7 @@ cat <<'EOF'
      certbot --nginx -d comms.nexolu.co
      certbot --nginx -d payments.nexolu.co
      certbot --nginx -d auth.nexolu.co
+     certbot --nginx -d hogar.nexolu.co
 
    certbot instala su propio timer de renovacion automatica (systemctl
    status certbot.timer) - no hace falta cron aparte.

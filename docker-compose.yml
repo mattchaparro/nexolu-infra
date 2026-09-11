@@ -210,6 +210,55 @@ services:
       - "127.0.0.1:8030:8000"
     networks: [nexolu]
 
+  # --- Hogar - dominio: hogar.nexolu.co ---
+  # La oveja distinta del corral, y a proposito:
+  #
+  # - **No usa MySQL.** Es una app de dos personas: su base es un archivo
+  #   SQLite en el volumen `hogar_data`. Sin `depends_on`, sin migraciones, y
+  #   una carga que no compite con nada.
+  # - **El volumen NO es opcional.** El .db vive en /data; si se omite, cada
+  #   `docker compose build hogar` se lleva las cuentas enteras por delante.
+  # - **Le habla a ia-core y a comms-api por la red interna `nexolu`**, no por
+  #   sus dominios publicos: ni el chat ni los recordatorios tienen por que
+  #   salir a internet para volver al mismo droplet. En su .env van
+  #   IA_CORE_BASE_URL=http://ia-core:8000 y COMMS_BASE_URL=http://comms-api:8000,
+  #   y en el registro de la app DENTRO de ia-core (POST /v1/admin/apps) el
+  #   base_url tiene que ser http://hogar:8000 -- 127.0.0.1 ahi apunta al
+  #   contenedor de ia-core, no a este.
+  hogar:
+    build:
+      context: ../hogar-app
+      dockerfile: Dockerfile
+    image: hogar-app:latest
+    restart: unless-stopped
+    env_file: ../hogar-app/.env
+    environment:
+      # El "hoy" de la app ya se resuelve con ZoneInfo(TIMEZONE) en codigo,
+      # pero los logs del contenedor tambien deberian estar en hora local.
+      TZ: America/Bogota
+    volumes:
+      - hogar_data:/data
+    ports:
+      # 8030 se lo quedo `auth`; este es el siguiente libre.
+      - "127.0.0.1:8040:8000"
+    networks: [nexolu]
+
+  # Los recordatorios de WhatsApp, en su propio proceso sobre la MISMA imagen
+  # -- mismo criterio que pos-scheduler al lado de pos-web. Dentro del proceso
+  # web se duplicaria con cada replica y moriria en silencio si el bucle
+  # revienta, y ahi nadie se entera de que dejaron de salir.
+  hogar-recordatorios:
+    image: hogar-app:latest
+    restart: unless-stopped
+    env_file: ../hogar-app/.env
+    environment:
+      TZ: America/Bogota
+    volumes:
+      - hogar_data:/data
+    depends_on: [hogar]
+    networks: [nexolu]
+    command: ["python", "-m", "hogar_app.scheduler"]
+
 networks:
   nexolu:
     driver: bridge
@@ -218,3 +267,4 @@ volumes:
   mysql_data:
   redis_data:
   pos_storage:
+  hogar_data:

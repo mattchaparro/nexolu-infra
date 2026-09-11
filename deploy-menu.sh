@@ -7,12 +7,12 @@
 #   ./deploy-menu.sh              Menu interactivo.
 #   ./deploy-menu.sh pos-api      Despliega directo un servicio, sin menu
 #                                 (valores: pos-api, ia-core, comms-api,
-#                                 payments-core, auth, pos-front,
-#                                 store-front, all, infra).
+#                                 payments-core, auth, hogar,
+#                                 pos-front, store-front, all, infra).
 set -u
 cd "$(dirname "$0")"
 
-SERVICIOS_PY=(ia-core:nexolu-ia-core:8000 comms-api:nexolu-comms-api:8010 payments-core:nexolu-payments-core:8020 auth:nexolu-auth:8030)
+SERVICIOS_PY=(ia-core:nexolu-ia-core:8000 comms-api:nexolu-comms-api:8010 payments-core:nexolu-payments-core:8020 auth:nexolu-auth:8030 hogar:hogar-app:8040)
 
 log() { echo "[deploy] $*"; }
 
@@ -107,6 +107,9 @@ deploy_python() {
         comms-api) avisar_env_faltante "$nombre" "../$repo/.env" BREVO_API_KEY ;;
         payments-core) log "    (Wompi sandbox: se completa aparte, ver README de nexolu-payments-core)" ;;
         auth) avisar_env_faltante "$nombre" "../$repo/.env" AUTH_JWT_PRIVATE_KEY ;;
+        # Sin esta llave el chat queda apagado, pero el resto de la app
+        # funciona igual: es un aviso, no un bloqueo.
+        hogar) avisar_env_faltante "$nombre" "../$repo/.env" IA_CORE_API_KEY ;;
     esac
     ( cd "../$repo" && ./deploy.sh ) || return 1
     verificar_salud "http://127.0.0.1:${puerto}/health"
@@ -177,6 +180,7 @@ deploy_uno() {
         comms-api) deploy_python comms-api nexolu-comms-api 8010 ;;
         payments-core) deploy_python payments-core nexolu-payments-core 8020 ;;
         auth) deploy_python auth nexolu-auth 8030 ;;
+        hogar) deploy_python hogar hogar-app 8040 ;;
         pos-front) deploy_frontend ;;
         store-front) deploy_store_front ;;
         *) log "Servicio desconocido: $1"; return 1 ;;
@@ -202,8 +206,9 @@ if [ "${1:-}" != "" ]; then
         infra) levantar_infra ;;
         all) deploy_todos ;;
         pos-api|ia-core|comms-api|payments-core|auth) levantar_infra && deploy_uno "$1" ;;
-        pos-front|store-front) deploy_uno "$1" ;;
-        *) echo "Uso: $0 [pos-api|ia-core|comms-api|payments-core|auth|pos-front|store-front|all|infra]"; exit 1 ;;
+        # hogar no toca MySQL: su base es un SQLite propio en un volumen.
+        pos-front|store-front|hogar) deploy_uno "$1" ;;
+        *) echo "Uso: $0 [pos-api|ia-core|comms-api|payments-core|auth|hogar|pos-front|store-front|all|infra]"; exit 1 ;;
     esac
     exit $?
 fi
@@ -211,7 +216,7 @@ fi
 echo "Nexolu - Deploy interactivo"
 echo
 PS3=$'\n''Que queres desplegar? '
-opciones=("Todos (infra + 7 servicios)" "Solo infra (mysql+redis)" "pos-api" "ia-core" "comms-api" "payments-core" "auth" "pos-front" "store-front" "Salir")
+opciones=("Todos (infra + 8 servicios)" "Solo infra (mysql+redis)" "pos-api" "ia-core" "comms-api" "payments-core" "auth" "hogar" "pos-front" "store-front" "Salir")
 select opt in "${opciones[@]}"; do
     case "$REPLY" in
         1) deploy_todos; break ;;
@@ -221,9 +226,10 @@ select opt in "${opciones[@]}"; do
         5) levantar_infra && deploy_uno comms-api; break ;;
         6) levantar_infra && deploy_uno payments-core; break ;;
         7) levantar_infra && deploy_uno auth; break ;;
-        8) deploy_uno pos-front; break ;;
-        9) deploy_uno store-front; break ;;
-        10) exit 0 ;;
+        8) deploy_uno hogar; break ;;
+        9) deploy_uno pos-front; break ;;
+        10) deploy_uno store-front; break ;;
+        11) exit 0 ;;
         *) echo "Opcion invalida." ;;
     esac
 done
