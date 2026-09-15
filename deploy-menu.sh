@@ -173,6 +173,21 @@ deploy_store_front() {
     return 0
 }
 
+# comms-front (Nexolu Connect, panel de comms-api). Mismo patron de un solo
+# modo que store-front: build estatico + release atomica servida por nginx
+# (nginx/connect.nexolu.co.conf). Si el repo no esta clonado en este
+# droplet, avisa y sale sin romper un `all`.
+deploy_comms_front() {
+    log "=== comms-front ==="
+    if [ ! -x ../nexolu-comms-front/deploy.sh ]; then
+        log "    (sin nexolu-comms-front en este droplet, se omite)"
+        return 0
+    fi
+    ../nexolu-comms-front/deploy.sh || return 1
+    verificar_salud https://connect.nexolu.co/
+    return 0
+}
+
 deploy_uno() {
     case "$1" in
         pos-api) deploy_pos_api ;;
@@ -183,6 +198,7 @@ deploy_uno() {
         hogar) deploy_python hogar hogar-app 8040 ;;
         pos-front) deploy_frontend ;;
         store-front) deploy_store_front ;;
+        comms-front) deploy_comms_front ;;
         *) log "Servicio desconocido: $1"; return 1 ;;
     esac
 }
@@ -196,6 +212,7 @@ deploy_todos() {
     done
     deploy_frontend
     deploy_store_front
+    deploy_comms_front
 }
 
 # ---------------------------------------------------------------------------
@@ -207,8 +224,9 @@ if [ "${1:-}" != "" ]; then
         all) deploy_todos ;;
         pos-api|ia-core|comms-api|payments-core|auth) levantar_infra && deploy_uno "$1" ;;
         # hogar no toca MySQL: su base es un SQLite propio en un volumen.
-        pos-front|store-front|hogar) deploy_uno "$1" ;;
-        *) echo "Uso: $0 [pos-api|ia-core|comms-api|payments-core|auth|hogar|pos-front|store-front|all|infra]"; exit 1 ;;
+        # Los fronts estaticos tampoco: nunca pasan por levantar_infra.
+        pos-front|store-front|comms-front|hogar) deploy_uno "$1" ;;
+        *) echo "Uso: $0 [pos-api|ia-core|comms-api|payments-core|auth|hogar|pos-front|store-front|comms-front|all|infra]"; exit 1 ;;
     esac
     exit $?
 fi
@@ -216,7 +234,7 @@ fi
 echo "Nexolu - Deploy interactivo"
 echo
 PS3=$'\n''Que queres desplegar? '
-opciones=("Todos (infra + 8 servicios)" "Solo infra (mysql+redis)" "pos-api" "ia-core" "comms-api" "payments-core" "auth" "hogar" "pos-front" "store-front" "Salir")
+opciones=("Todos (infra + 9 servicios)" "Solo infra (mysql+redis)" "pos-api" "ia-core" "comms-api" "payments-core" "auth" "hogar" "pos-front" "store-front" "comms-front" "Salir")
 select opt in "${opciones[@]}"; do
     case "$REPLY" in
         1) deploy_todos; break ;;
@@ -229,7 +247,8 @@ select opt in "${opciones[@]}"; do
         8) deploy_uno hogar; break ;;
         9) deploy_uno pos-front; break ;;
         10) deploy_uno store-front; break ;;
-        11) exit 0 ;;
+        11) deploy_uno comms-front; break ;;
+        12) exit 0 ;;
         *) echo "Opcion invalida." ;;
     esac
 done
