@@ -168,6 +168,13 @@ services:
     env_file: ../nexolu-comms-api/.env
     environment:
       TZ: America/Bogota
+      # Multimedia subida desde el panel de Connect (bloque Imagen del
+      # builder): persiste fuera del contenedor y se sirve publica en
+      # https://comms.nexolu.co/media/ (Meta la descarga al enviar).
+      MEDIA_DIR: /app/media
+      MEDIA_BASE_URL: https://comms.nexolu.co
+    volumes:
+      - ./data/comms-media:/app/media
     depends_on:
       mysql: { condition: service_healthy }
     ports:
