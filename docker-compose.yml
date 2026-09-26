@@ -266,6 +266,64 @@ services:
     networks: [nexolu]
     command: ["python", "-m", "hogar_app.scheduler"]
 
+  # ------------------------------------------------------------------ SGA
+  #
+  # Son DOS contenedores porque son dos repos: la API (Laravel) y el front
+  # (Vue compilado, servido por su propio nginx). El vhost de sga.nexolu.co
+  # reparte por ruta -- /api y /storage a la API, el resto al front -- asi que
+  # el navegador ve un solo origen y no hay CORS que configurar.
+  sga-api:
+    build:
+      context: ../sga-api
+      dockerfile: Dockerfile
+    image: sga-api:latest
+    restart: unless-stopped
+    env_file: ../sga-api/.env
+    environment:
+      TZ: America/Bogota
+    depends_on:
+      mysql: { condition: service_healthy }
+    volumes:
+      # El escudo del colegio, las firmas, las imagenes del muro y el cache de
+      # fuentes de dompdf. Si esto no persiste, cada build borra lo que el
+      # colegio subio.
+      - sga_storage:/var/www/html/storage
+    ports:
+      - "127.0.0.1:8050:80"
+    networks: [nexolu]
+
+  # La mora al dia, todas las mananas a las 6:00 (ver routes/console.php del
+  # repo). En su propio proceso y no dentro del web: ahi se duplicaria con
+  # cada replica y moriria en silencio si el bucle revienta. Mismo criterio
+  # que pos-scheduler.
+  sga-scheduler:
+    image: sga-api:latest
+    restart: unless-stopped
+    env_file: ../sga-api/.env
+    environment:
+      TZ: America/Bogota
+    depends_on:
+      mysql: { condition: service_healthy }
+    volumes:
+      - sga_storage:/var/www/html/storage
+    networks: [nexolu]
+    command: ["php", "artisan", "schedule:work"]
+
+  sga-front:
+    build:
+      context: ../sga-front
+      dockerfile: Dockerfile
+      args:
+        # Vite la resuelve al COMPILAR y queda dentro del bundle: como
+        # variable de entorno del contenedor no serviria de nada. Sin ella la
+        # interfaz sale con marca de agua.
+        VITE_PRIMEVUE_LICENSE_KEY: ${SGA_PRIMEVUE_LICENSE_KEY:-}
+    image: sga-front:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8051:80"
+    networks: [nexolu]
+
 networks:
   nexolu:
     driver: bridge
@@ -273,5 +331,6 @@ networks:
 volumes:
   mysql_data:
   redis_data:
+  sga_storage:
   pos_storage:
   hogar_data:

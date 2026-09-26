@@ -15,6 +15,8 @@ Repos que orquesta (clonados como **hermanos** de este repo en el droplet):
 | `nexolu-payments-core` | `payments.nexolu.co` | 127.0.0.1:8020 |
 | `nexolu-auth` | `auth.nexolu.co` | 127.0.0.1:8030 |
 | `hogar-app` | `hogar.nexolu.co` | 127.0.0.1:8040 |
+| `sga-api` | `sga.nexolu.co` (`/api`, `/storage`) | 127.0.0.1:8050 |
+| `sga-front` | `sga.nexolu.co` (el resto) | 127.0.0.1:8051 |
 
 `hogar-app` es el unico que no se llama `nexolu-*`: no es un producto del
 ecosistema sino una app personal (cuentas, recibos, tareas y mercado de una
