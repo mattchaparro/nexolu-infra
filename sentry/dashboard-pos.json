@@ -1,0 +1,457 @@
+{
+  "title": "POS Nexolu: salud y rendimiento",
+  "projects": [
+    4512297631678464,
+    4512297631744000
+  ],
+  "environment": [
+    "production"
+  ],
+  "period": "7d",
+  "widgets": [
+    {
+      "title": "API: peticiones por minuto (RPM)",
+      "description": "",
+      "displayType": "line",
+      "widgetType": "spans",
+      "interval": "5m",
+      "queries": [
+        {
+          "name": "",
+          "fields": [
+            "epm()"
+          ],
+          "aggregates": [
+            "epm()"
+          ],
+          "columns": [],
+          "conditions": "project:nexolu-pos-api span.op:http.server is_transaction:true",
+          "orderby": ""
+        }
+      ],
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "w": 2,
+        "h": 2,
+        "minH": 2
+      }
+    },
+    {
+      "title": "API: latencia p50 y p95 (ms)",
+      "description": "",
+      "displayType": "line",
+      "widgetType": "spans",
+      "interval": "5m",
+      "queries": [
+        {
+          "name": "",
+          "fields": [
+            "p50(span.duration)",
+            "p95(span.duration)"
+          ],
+          "aggregates": [
+            "p50(span.duration)",
+            "p95(span.duration)"
+          ],
+          "columns": [],
+          "conditions": "project:nexolu-pos-api span.op:http.server is_transaction:true",
+          "orderby": ""
+        }
+      ],
+      "layout": {
+        "x": 2,
+        "y": 0,
+        "w": 2,
+        "h": 2,
+        "minH": 2
+      }
+    },
+    {
+      "title": "API: tasa de fallos (error rate)",
+      "description": "",
+      "displayType": "line",
+      "widgetType": "spans",
+      "interval": "5m",
+      "queries": [
+        {
+          "name": "",
+          "fields": [
+            "failure_rate()"
+          ],
+          "aggregates": [
+            "failure_rate()"
+          ],
+          "columns": [],
+          "conditions": "project:nexolu-pos-api span.op:http.server is_transaction:true",
+          "orderby": ""
+        }
+      ],
+      "layout": {
+        "x": 4,
+        "y": 0,
+        "w": 2,
+        "h": 2,
+        "minH": 2
+      }
+    },
+    {
+      "title": "Errores por proyecto",
+      "description": "",
+      "displayType": "line",
+      "widgetType": "error-events",
+      "interval": "5m",
+      "queries": [
+        {
+          "name": "",
+          "fields": [
+            "project",
+            "count()"
+          ],
+          "aggregates": [
+            "count()"
+          ],
+          "columns": [
+            "project"
+          ],
+          "conditions": "",
+          "orderby": "-count()"
+        }
+      ],
+      "layout": {
+        "x": 0,
+        "y": 2,
+        "w": 2,
+        "h": 2,
+        "minH": 2
+      },
+      "limit": 5
+    },
+    {
+      "title": "Trafico por hora (horas pico)",
+      "description": "Peticiones al API agrupadas por hora. Con el rango en 7 o 14 dias se ven las horas de mas venta.",
+      "displayType": "bar",
+      "widgetType": "spans",
+      "interval": "1h",
+      "queries": [
+        {
+          "name": "",
+          "fields": [
+            "count()"
+          ],
+          "aggregates": [
+            "count()"
+          ],
+          "columns": [],
+          "conditions": "project:nexolu-pos-api span.op:http.server is_transaction:true",
+          "orderby": ""
+        }
+      ],
+      "layout": {
+        "x": 2,
+        "y": 2,
+        "w": 4,
+        "h": 2,
+        "minH": 2
+      }
+    },
+    {
+      "title": "Queries SQL que mas tiempo consumen",
+      "description": "Tiempo total = cuantas veces corre x cuanto tarda. Es la lista de que optimizar primero.",
+      "displayType": "table",
+      "widgetType": "spans",
+      "interval": "5m",
+      "queries": [
+        {
+          "name": "",
+          "fields": [
+            "span.description",
+            "count()",
+            "avg(span.duration)",
+            "p95(span.duration)",
+            "sum(span.duration)"
+          ],
+          "aggregates": [
+            "count()",
+            "avg(span.duration)",
+            "p95(span.duration)",
+            "sum(span.duration)"
+          ],
+          "columns": [
+            "span.description"
+          ],
+          "conditions": "project:nexolu-pos-api span.op:db.sql.query",
+          "orderby": "-sum(span.duration)"
+        }
+      ],
+      "layout": {
+        "x": 0,
+        "y": 4,
+        "w": 6,
+        "h": 4,
+        "minH": 2
+      }
+    },
+    {
+      "title": "Queries mas repetidas (posibles N+1)",
+      "description": "Una query que aparece miles de veces suele ser una consulta dentro de un ciclo.",
+      "displayType": "table",
+      "widgetType": "spans",
+      "interval": "5m",
+      "queries": [
+        {
+          "name": "",
+          "fields": [
+            "span.description",
+            "count()",
+            "avg(span.duration)"
+          ],
+          "aggregates": [
+            "count()",
+            "avg(span.duration)"
+          ],
+          "columns": [
+            "span.description"
+          ],
+          "conditions": "project:nexolu-pos-api span.op:db.sql.query",
+          "orderby": "-count()"
+        }
+      ],
+      "layout": {
+        "x": 0,
+        "y": 8,
+        "w": 3,
+        "h": 4,
+        "minH": 2
+      }
+    },
+    {
+      "title": "Problemas de rendimiento sin resolver (N+1, queries lentas)",
+      "description": "",
+      "displayType": "table",
+      "widgetType": "issue",
+      "interval": "5m",
+      "queries": [
+        {
+          "name": "",
+          "fields": [
+            "issue",
+            "assignee",
+            "title"
+          ],
+          "aggregates": [],
+          "columns": [
+            "issue",
+            "assignee",
+            "title"
+          ],
+          "conditions": "is:unresolved issue.category:performance",
+          "orderby": "freq"
+        }
+      ],
+      "layout": {
+        "x": 3,
+        "y": 8,
+        "w": 3,
+        "h": 4,
+        "minH": 2
+      }
+    },
+    {
+      "title": "Endpoints mas lentos",
+      "description": "",
+      "displayType": "table",
+      "widgetType": "spans",
+      "interval": "5m",
+      "queries": [
+        {
+          "name": "",
+          "fields": [
+            "transaction",
+            "count()",
+            "p95(span.duration)",
+            "failure_rate()"
+          ],
+          "aggregates": [
+            "count()",
+            "p95(span.duration)",
+            "failure_rate()"
+          ],
+          "columns": [
+            "transaction"
+          ],
+          "conditions": "project:nexolu-pos-api span.op:http.server is_transaction:true",
+          "orderby": "-p95(span.duration)"
+        }
+      ],
+      "layout": {
+        "x": 0,
+        "y": 12,
+        "w": 3,
+        "h": 4,
+        "minH": 2
+      }
+    },
+    {
+      "title": "Errores sin resolver",
+      "description": "",
+      "displayType": "table",
+      "widgetType": "issue",
+      "interval": "5m",
+      "queries": [
+        {
+          "name": "",
+          "fields": [
+            "issue",
+            "assignee",
+            "title"
+          ],
+          "aggregates": [],
+          "columns": [
+            "issue",
+            "assignee",
+            "title"
+          ],
+          "conditions": "is:unresolved issue.category:error",
+          "orderby": "freq"
+        }
+      ],
+      "layout": {
+        "x": 3,
+        "y": 12,
+        "w": 3,
+        "h": 4,
+        "minH": 2
+      }
+    },
+    {
+      "title": "Front: velocidad de carga (LCP y FCP, p75)",
+      "description": "",
+      "displayType": "line",
+      "widgetType": "spans",
+      "interval": "1h",
+      "queries": [
+        {
+          "name": "",
+          "fields": [
+            "p75(measurements.lcp)",
+            "p75(measurements.fcp)"
+          ],
+          "aggregates": [
+            "p75(measurements.lcp)",
+            "p75(measurements.fcp)"
+          ],
+          "columns": [],
+          "conditions": "project:nexolu-pos-front span.op:pageload",
+          "orderby": ""
+        }
+      ],
+      "layout": {
+        "x": 0,
+        "y": 16,
+        "w": 3,
+        "h": 2,
+        "minH": 2
+      }
+    },
+    {
+      "title": "Front: pantallas mas lentas",
+      "description": "",
+      "displayType": "table",
+      "widgetType": "spans",
+      "interval": "5m",
+      "queries": [
+        {
+          "name": "",
+          "fields": [
+            "transaction",
+            "count()",
+            "p75(measurements.lcp)"
+          ],
+          "aggregates": [
+            "count()",
+            "p75(measurements.lcp)"
+          ],
+          "columns": [
+            "transaction"
+          ],
+          "conditions": "project:nexolu-pos-front span.op:pageload",
+          "orderby": "-p75(measurements.lcp)"
+        }
+      ],
+      "layout": {
+        "x": 3,
+        "y": 16,
+        "w": 3,
+        "h": 2,
+        "minH": 2
+      }
+    },
+    {
+      "title": "Errores por negocio",
+      "description": "",
+      "displayType": "table",
+      "widgetType": "error-events",
+      "interval": "5m",
+      "queries": [
+        {
+          "name": "",
+          "fields": [
+            "business_name",
+            "count()"
+          ],
+          "aggregates": [
+            "count()"
+          ],
+          "columns": [
+            "business_name"
+          ],
+          "conditions": "",
+          "orderby": "-count()"
+        }
+      ],
+      "layout": {
+        "x": 0,
+        "y": 18,
+        "w": 3,
+        "h": 3,
+        "minH": 2
+      }
+    },
+    {
+      "title": "Tareas programadas: duracion y fallos",
+      "description": "",
+      "displayType": "table",
+      "widgetType": "spans",
+      "interval": "5m",
+      "queries": [
+        {
+          "name": "",
+          "fields": [
+            "transaction",
+            "count()",
+            "p95(span.duration)",
+            "failure_rate()"
+          ],
+          "aggregates": [
+            "count()",
+            "p95(span.duration)",
+            "failure_rate()"
+          ],
+          "columns": [
+            "transaction"
+          ],
+          "conditions": "project:nexolu-pos-api span.op:console.command.scheduled is_transaction:true",
+          "orderby": "-p95(span.duration)"
+        }
+      ],
+      "layout": {
+        "x": 3,
+        "y": 18,
+        "w": 3,
+        "h": 3,
+        "minH": 2
+      }
+    }
+  ]
+}
