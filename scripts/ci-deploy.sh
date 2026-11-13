@@ -117,9 +117,15 @@ deploy_pos_api() {
         | while read -r old; do docker rmi "$API_IMAGE:$old" >/dev/null 2>&1 || true; done
     docker image prune -f >/dev/null || true
 
-    local code
-    code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 https://pos-backend.nexolu.co/up || echo 000)"
-    log "curl https://pos-backend.nexolu.co/up -> $code"
+    # pos-web acaba de recrearse: el primer /up puede dar 502 mientras arranca
+    # php-fpm. Se reintenta hasta 60 s antes de dar el deploy por fallido.
+    local code="000" attempt
+    for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
+        code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 https://pos-backend.nexolu.co/up || echo 000)"
+        log "curl https://pos-backend.nexolu.co/up -> $code (intento $attempt/12)"
+        [ "$code" = "200" ] && break
+        sleep 5
+    done
     [ "$code" = "200" ] || fallar "la API no respondio 200. Volver atras: desplegar la version anterior."
 }
 
