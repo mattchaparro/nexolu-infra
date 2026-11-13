@@ -1,0 +1,2 @@
+# Los scripts corren en el droplet (Linux): con CRLF bash falla en la primera línea.
+*.sh text eol=lf
