@@ -29,6 +29,9 @@ API_IMAGE="ghcr.io/mattchaparro/nexolu-pos-api"
 API_LOCAL_IMAGE="nexolu-pos-api:latest"
 # Versiones de la API que se guardan para volver atrás sin descargar.
 API_KEEP=3
+# Volcados previos a cada deploy de la API (ver backup_before_deploy).
+PREDEPLOY_BACKUP_DIR="${CI_DEPLOY_BACKUP_DIR:-/opt/respaldos/pre-deploy}"
+PREDEPLOY_KEEP=7
 LOG_FILE="${CI_DEPLOY_LOG:-/var/log/nexolu-ci-deploy.log}"
 
 log() { echo "[ci-deploy] $*" | tee -a "$LOG_FILE" >&2; }
@@ -50,11 +53,51 @@ flock -w 600 9 || fallar "hay otro deploy en curso desde hace 10 minutos"
 
 log "==> $(date '+%F %T') $target $version"
 
+# Volcado de pos_saas justo antes de tocar nada. El respaldo de las 03:00
+# (respaldo-bases.sh) puede tener hasta 24 h de antigüedad; este es el punto
+# de retorno de ESTE deploy, que puede traer migraciones. Si el volcado falla
+# el deploy se aborta ANTES de reiniciar, así producción queda como estaba.
+# Se guardan los últimos $PREDEPLOY_KEEP en $PREDEPLOY_BACKUP_DIR (mismo
+# disco: la copia fuera del droplet es el respaldo nocturno a Spaces).
+backup_before_deploy() {
+    local dir="$PREDEPLOY_BACKUP_DIR/$(date +%F_%H%M%S)_$version"
+    local file="$dir/pos_saas.sql.gz"
+    local free_mb
+
+    free_mb="$(df -Pm "$(dirname "$PREDEPLOY_BACKUP_DIR")" | awk 'NR==2 {print $4}')"
+    [ "${free_mb:-0}" -ge 2048 ] || fallar "menos de 2 GB libres (${free_mb:-?} MB): no se arriesga a volcar y desplegar"
+
+    log "==> respaldo previo de pos_saas"
+    mkdir -p "$dir" && chmod 700 "$PREDEPLOY_BACKUP_DIR" "$dir"
+    # mismas opciones que respaldo-bases.sh; pipefail hace fallar el pipe si
+    # mysqldump falla aunque gzip termine bien.
+    if ! ionice -c3 nice -n 19 docker exec nexolu-mysql-1 sh -c \
+        'mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" --single-transaction --routines --triggers --events --set-gtid-purged=OFF --no-tablespaces --databases pos_saas' 2>/dev/null \
+        | gzip -6 > "$file.tmp"; then
+        rm -rf -- "$dir"
+        fallar "el respaldo previo de pos_saas fallo; no se despliega nada"
+    fi
+    # Un dump vacío o truncado también es un fallo.
+    if ! gzip -t "$file.tmp" 2>/dev/null || [ "$(stat -c %s "$file.tmp")" -lt 10240 ]; then
+        rm -rf -- "$dir"
+        fallar "el respaldo previo de pos_saas salio vacio o corrupto; no se despliega nada"
+    fi
+    mv "$file.tmp" "$file"
+    log "==> respaldo previo listo: $file ($(du -h "$file" | cut -f1))"
+
+    { ls -1dt "$PREDEPLOY_BACKUP_DIR"/*/ 2>/dev/null || true; } \
+        | tail -n +"$((PREDEPLOY_KEEP + 1))" \
+        | while read -r old; do rm -rf -- "$old"; done
+}
+
 deploy_pos_api() {
     local image="$API_IMAGE:$version"
 
     log "==> descargando $image"
     docker pull -q "$image" >/dev/null || fallar "no se pudo descargar $image (¿existe el tag? ¿el paquete es publico?)"
+
+    backup_before_deploy
+
     docker tag "$image" "$API_LOCAL_IMAGE"
 
     cd "$NEXOLU_DIR/nexolu-infra"

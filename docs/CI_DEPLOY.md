@@ -62,6 +62,15 @@ script rechaza cualquier otra cosa. Log en `/var/log/nexolu-ci-deploy.log`.
 6. Probar primero con pos-front (se vuelve atrás al instante), después la
    tienda y por último la API.
 
+## Respaldo antes de cada deploy de la API
+
+`ci-deploy.sh` vuelca `pos_saas` a `/opt/respaldos/pre-deploy/<fecha>_<version>/pos_saas.sql.gz`
+**antes de reiniciar nada** (unos 3 MB y ~8 s). Si el volcado falla, sale vacío o
+hay menos de 2 GB libres, el deploy se aborta y producción queda como estaba.
+Se guardan los últimos 7. Para restaurar, sobre una base temporal y nunca
+encima de la productiva: `gunzip -c pos_saas.sql.gz | docker exec -i nexolu-mysql-1 mysql ...`.
+Es complementario al respaldo de las 03:00 (14 días) y no sale del droplet.
+
 ## Costo
 
 nexolu-pos-api y nexolu-pos-front son repos públicos: Actions y los paquetes
