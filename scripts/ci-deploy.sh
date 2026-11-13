@@ -69,7 +69,7 @@ deploy_pos_api() {
 
     log "==> borrando versiones viejas de la imagen (se guardan $API_KEEP)"
     docker images "$API_IMAGE" --format '{{.Tag}}' \
-        | grep -vx "$version" \
+        | { grep -vx "$version" || true; } \
         | tail -n +"$API_KEEP" \
         | while read -r old; do docker rmi "$API_IMAGE:$old" >/dev/null 2>&1 || true; done
     docker image prune -f >/dev/null || true
